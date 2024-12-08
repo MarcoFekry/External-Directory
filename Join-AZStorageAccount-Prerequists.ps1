@@ -16,17 +16,21 @@ $Path = "C:\AzFilesHybrid.zip"
 
 Invoke-WebRequest -URI $URL -OutFile $Path 
 
-$URL= "https://1drv.ms/u/s!Agmd1-sdw98kkrdSxRSHwqpO_omEew?e=YrirBd"
-$Path = "C:\Join-AZStorageAccount-AD.ps1"
 
-Invoke-WebRequest -URI $URL -OutFile $Path 
+
+$fileUrl = "https://raw.githubusercontent.com/MarcoFekry/External-Directory/main/Join-AZStorageAccount-AD.ps1"
+$outputPath = "C:\Join-AZStorageAccount-AD.ps1"
+
+# Download the file
+Invoke-WebRequest -Uri $fileUrl -OutFile $outputPath
+
 
 
 $DestinationPath = "C:\AzFilesHybrid"
 
 New-Item -Path "C:\AzFilesHybrid" -ItemType Directory
 
-Expand-Archive -Path $Path -DestinationPath $DestinationPath
+Expand-Archive -Path $Path -DestinationPath $DestinationPath -Force
 
 cd "C:\AzFilesHybrid"
 
@@ -36,17 +40,15 @@ cd "C:\AzFilesHybrid"
 
 Import-Module -Name AzFilesHybrid -Force 
 
+$fileUrl = "https://raw.githubusercontent.com/MarcoFekry/External-Directory/main/MountNTFSFSlogix.ps1"
+$outputPath = "C:\MountNTFSFSlogix.ps1"
 
-$URL= "https://1drv.ms/u/s!Agmd1-sdw98kkrdQhCoxoE9m7CXV3A?e=OUlZwN"
-$Path = "C:\MountNTFSFSlogix.ps1"
-
-Invoke-WebRequest -URI $URL -OutFile $Path 
-
-
+# Download the file
+Invoke-WebRequest -Uri $fileUrl -OutFile $outputPath
 
 
-$URL= "https://1drv.ms/u/s!Agmd1-sdw98kkrdR0BAldEGsJ0MJvg?e=MQY0YX"
-$Path = "C:\Join-AZStorageAccount-Prerequists.ps1"
+$fileUrl = "https://raw.githubusercontent.com/MarcoFekry/External-Directory/main/Join-AZStorageAccount-Prerequists.ps1"
+$outputPath = "C:\Join-AZStorageAccount-Prerequists.ps1"
 
-Invoke-WebRequest -URI $URL -OutFile $Path 
-
+# Download the file
+Invoke-WebRequest -Uri $fileUrl -OutFile $outputPath
