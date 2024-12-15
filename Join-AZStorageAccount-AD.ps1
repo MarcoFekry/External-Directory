@@ -5,7 +5,7 @@ Invoke-WebRequest -URI $URL -OutFile $Path
 
 $Path = "C:\AzFilesHybrid.zip"
 $DestinationPath = "C:\AzFilesHybrid"
-Expand-Archive -Path $Path -DestinationPath $DestinationPath
+Expand-Archive -Path $Path -DestinationPath $DestinationPath -Force
 
 cd "C:\AzFilesHybrid"
 
