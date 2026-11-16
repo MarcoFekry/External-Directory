@@ -12,7 +12,7 @@
   --bg:#EEF2F6; --surface:#FFFFFF; --sunk:#F5F8FB; --ink:#0F1E33; --ink-2:#4A5B70; --ink-3:#7A8A9D;
   --line:#D6DEE7; --line-2:#E6ECF2; --signal:#0A6F86; --signal-ink:#FFFFFF; --signal-soft:#DCEFF3;
   --flag:#9A5B07; --flag-soft:#FBEFD9; --ok:#23744A; --ok-soft:#DDF1E5; --focus:#1A8FB0;
-  --c1:#0A6F86; --c2:#3E62B8; --c3:#7A4FB0; --c4:#B04F7E; --c5:#C26A2E; --c6:#8C8A1F; --c7:#2E8C62; --c8:#4F7A99; --c9:#9B4040; --c10:#5B6575;
+  --c1:#0A6F86; --c2:#3E62B8; --c3:#7A4FB0; --c4:#B04F7E; --c5:#C26A2E; --c6:#8C8A1F; --c7:#2E8C62; --c8:#4F7A99; --c9:#9B4040; --c10:#5B6575; --c11:#A0791B;
   color-scheme:light;
   box-sizing:border-box;
   padding-top:env(safe-area-inset-top,0px);
@@ -137,6 +137,11 @@ legend.ql{padding:0}
 .stack{display:flex;height:12px;border-radius:6px;overflow:hidden;background:var(--line-2);margin:16px 0 18px}
 .stack i{display:block;height:100%;transition:flex-grow .35s ease}
 .costs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
+.addon{margin:-6px 0 18px;font-size:.88rem;border:1px solid var(--line-2);border-radius:8px;padding:8px 12px}
+.addon[hidden]{display:none}
+.addon div{display:flex;justify-content:space-between;gap:8px;padding:3px 0;font-variant-numeric:tabular-nums}
+.addon span{color:var(--ink-2)}
+.addon .grand{border-top:1px solid var(--line-2);margin-top:4px;padding-top:6px}
 .costs div{background:var(--sunk);border-radius:8px;padding:10px 12px}
 .costs small{display:block;font-size:.78rem;color:var(--ink-3)}
 .costs b{font-size:1.15rem;font-variant-numeric:tabular-nums;font-weight:600}
@@ -235,12 +240,16 @@ legend.ql{padding:0}
         <div><small>Per day</small><b id="costDay">$0.00</b></div>
         <div><small>Per month</small><b id="costMonth">$0.00</b></div>
       </div>
+      <div class="addon" id="sapAddon" hidden><div><span>SAP solution add-on</span><b id="sapAddonMonth">$0.00</b></div><div class="grand"><span>Total per month with add-on</span><b id="grandMonth">$0.00</b></div></div>
       <ul class="breakdown" id="breakdown"></ul>
       <div class="note" id="tierNote" hidden>Over 100 GB/day: a commitment tier (reserved capacity) usually costs 33–60% less than pay-as-you-go.</div>
       <div class="rate">
         <label for="rateInput">Price per GB (USD)</label>
         <input type="number" id="rateInput" step="0.01" min="0" value="2.76">
         <div>Pay-as-you-go list price from the estimator. Check the current price for your region.</div>
+        <label for="sapRateInput" style="margin-top:12px">SAP add-on per production SID per hour (USD)</label>
+        <input type="number" id="sapRateInput" step="0.01" min="0" value="2">
+        <div>Microsoft’s list price for the Sentinel solution for SAP applications.</div>
       </div>
     </div>
   </aside>
@@ -260,6 +269,7 @@ const CATS = {
   azure:{name:"Azure platform",color:"var(--c5)"},
   network:{name:"Network",color:"var(--c6)"},
   multicloud:{name:"Multi-cloud",color:"var(--c7)"},
+  sap:{name:"SAP applications",color:"var(--c11)"},
   siem:{name:"SIEM integrations",color:"var(--c8)"},
   sources:{name:"Monitoring & custom",color:"var(--c9)"},
   soar:{name:"Playbooks",color:"var(--c10)"}
@@ -408,6 +418,26 @@ const SECTIONS = [
   {id:"mc_oci_flow",t:"number",l:"VCNs with flow logs",u:"VCNs",show:a=>has(a,"mc_clouds","Oracle Cloud")},
   {id:"mc_oci_cg",t:YN,l:"Send Cloud Guard alerts?",show:a=>has(a,"mc_clouds","Oracle Cloud")}
 ]},
+{ id:"sap", title:"SAP applications", est:"sap", intro:"SAP systems monitored with the Microsoft Sentinel solution for SAP applications, which connects agentlessly through SAP Integration Suite and SAP Cloud Connector.",
+  qs:[
+  {id:"sap",t:YN,l:"Do you run SAP systems that should be monitored?"},
+  {id:"sap_prod",t:"number",l:"How many production SAP systems (SIDs)?",u:"SIDs",h:"Microsoft charges an add-on of USD 2 per connected production SID per hour, on top of ingestion.",child:true,show:a=>yes(a,"sap"),feeds:a=>gt0(a,"sap_prod")?"Adds about "+(parseFloat(a.sap_prod)).toFixed(0)+" GB/day and "+money((parseFloat(a.sap_prod)||0)*sapRate()*24*30)+" a month in add-on charges":""},
+  {id:"sap_np",t:"number",l:"How many non-production SIDs (development, test, QA)?",u:"SIDs",h:"These aren’t charged the SAP add-on.",child:true,show:a=>yes(a,"sap")},
+  {id:"sap_types",t:"multi",l:"Which SAP products are in scope?",o:["S/4HANA on-premises","S/4HANA Cloud Private Edition (RISE)","S/4HANA Cloud Public Edition","SAP ECC","Other NetWeaver ABAP","SAP BTP"],child:true,show:a=>yes(a,"sap")},
+  {id:"sap_host",t:"multi",l:"Where are the SAP systems hosted?",o:["Azure","AWS","Google Cloud","On-premises","RISE (SAP-managed)"],child:true,show:a=>yes(a,"sap")},
+  {id:"sap_basis",t:"text",l:"Which SAP_BASIS release are the systems on?",h:"For example 7.40, 7.50 or 7.58. This decides which Microsoft Sentinel change requests (CRs) to apply.",ph:"e.g. 7.58",child:true,show:a=>yes(a,"sap")},
+  {id:"sap_agent",t:YN,l:"Do you currently use the containerized SAP data connector agent?",h:"Microsoft announced the agent would be permanently disabled by 30 September 2026, so existing deployments must move to the agentless connector.",child:true,show:a=>yes(a,"sap")},
+  {id:"sap_btp",t:YN,l:"Do you have an SAP BTP subaccount with SAP Integration Suite?",child:true,show:a=>yes(a,"sap")},
+  {id:"sap_cc",t:YN,l:"Is SAP Cloud Connector installed and linked to that subaccount?",child:true,show:a=>yes(a,"sap")},
+  {id:"sap_etd",t:YN,l:"Do you use SAP Enterprise Threat Detection?",child:true,show:a=>yes(a,"sap")},
+  {id:"sap_btpmon",t:YN,l:"Should SAP BTP audit logs also be monitored?"},
+  {id:"sap_btp_n",t:"number",l:"How many BTP subaccounts?",u:"subaccounts",child:true,show:a=>yes(a,"sap_btpmon")},
+  {g:"Readiness checks",ready:true,p:"Most SAP preparation is done by your SAP BASIS team. Answering No or Not sure adds an action item.",show:a=>yes(a,"sap")},
+  {id:"r_sap_team",t:YN,r:1,l:"Will your SAP BASIS team be available to apply the Sentinel CRs and create the connector role and user?",show:a=>yes(a,"sap")},
+  {id:"r_sap_audit",t:YN,r:1,l:"Is the SAP Security Audit Log enabled on all clients, including 000 and 066?",show:a=>yes(a,"sap")},
+  {id:"r_sap_roles",t:YN,r:1,l:"Can someone assign the SAP BTP Integration Suite roles (Integration_Provisioner, PI_Administrator, PI_Integration_Developer, PI_Business_Expert)?",show:a=>yes(a,"sap")},
+  {id:"r_sap_rfc",t:YN,r:1,l:"Can SAP Cloud Connector reach the SAP systems over RFC (with SNC if required)?",show:a=>yes(a,"sap")}
+]},
 { id:"siem", title:"SIEM integrations", est:"siem", intro:"Any SIEM you run today, and where Sentinel should send incidents or data.",
   qs:[
   {id:"si_existing",t:YN,l:"Do you run another SIEM today?"},
@@ -529,6 +559,9 @@ function estimate(){
   if(c.includes("AWS")){ add("multicloud","AWS CloudTrail",.2*N("mc_aws_accts")*mm); add("multicloud","AWS VPC flow",.4*N("mc_aws_flow")*mm); if(Y("mc_aws_gd")) add("multicloud","GuardDuty",.05*mm); }
   if(c.includes("Google Cloud")){ add("multicloud","GCP audit logs",.15*N("mc_gcp_proj")*mm); add("multicloud","GCP VPC flow",.35*N("mc_gcp_flow")*mm); if(Y("mc_gcp_scc")) add("multicloud","Security Command Center",.1*mm); }
   if(c.includes("Oracle Cloud")){ add("multicloud","OCI audit logs",.1*N("mc_oci_comp")*mm); add("multicloud","OCI VCN flow",.25*N("mc_oci_flow")*mm); if(Y("mc_oci_cg")) add("multicloud","Cloud Guard",.05*mm); }
+  const msap=M("sap");
+  if(Y("sap")){ add("sap","SAP production SIDs",1.0*N("sap_prod")*msap); add("sap","SAP non-production SIDs",.3*N("sap_np")*msap); }
+  if(Y("sap_btpmon")) add("sap","SAP BTP audit logs",.1*N("sap_btp_n")*msap);
   const ms=M("siem");
   if(Y("si_existing")) add("siem",(A.si_vendor||"Existing SIEM")+" instream",N("si_gb")*ms);
   if(Y("si_out")){ add("siem","Event Hubs outstream",.1*N("si_eh")*ms); add("siem","REST outstream",.05*N("si_rest")*ms); }
@@ -545,13 +578,19 @@ function estimate(){
   const rate=parseFloat(A.rate)>=0&&A.rate!==""&&A.rate!=null?parseFloat(A.rate):2.76;
   const total=items.reduce((s,i)=>s+i.gb,0);
   const byCat={}; items.forEach(i=>byCat[i.cat]=(byCat[i.cat]||0)+i.gb);
-  return {items,byCat,total,rate,day:total*rate,month:total*rate*30};
+  const addonDay=Y("sap")?N("sap_prod")*sapRate()*24:0;
+  return {items,byCat,total,rate,day:total*rate,month:total*rate*30,addonDay,addonMonth:addonDay*30,grandDay:total*rate+addonDay,grandMonth:(total*rate+addonDay)*30};
 }
+function sapRate(){ const v=parseFloat(A.sap_rate); return isNaN(v)||v<0?2:v; }
 const money=v=>"$"+v.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
 function renderMeter(){
   const e=estimate();
   $("#gbTotal").textContent=e.total.toFixed(2);
-  $("#meterMini").textContent=e.total.toFixed(2)+" GB/day, $"+Math.round(e.month).toLocaleString()+"/mo";
+  $("#meterMini").textContent=e.total.toFixed(2)+" GB/day, $"+Math.round(e.grandMonth).toLocaleString()+"/mo";
+  $("#sapAddon").hidden=!(e.addonDay>0);
+  $("#sapAddonMonth").textContent=money(e.addonMonth);
+  $("#grandMonth").textContent=money(e.grandMonth);
+  if(document.activeElement!==$("#sapRateInput")) $("#sapRateInput").value=sapRate();
   $("#costDay").textContent=money(e.day);
   $("#costMonth").textContent=money(e.month);
   $("#tierNote").hidden=e.total<=100;
@@ -647,7 +686,7 @@ function renderReview(){
     <div><small>Completed</small><b>${pct}%</b></div>
     <div><small>Open action items</small><b>${gaps.length}</b></div>
     <div><small>Estimated ingestion</small><b>${e.total.toFixed(2)} GB/day</b></div>
-    <div><small>Estimated monthly cost</small><b>${money(e.month)}</b></div>
+    <div><small>Estimated monthly cost${e.addonDay>0?" incl. SAP add-on":""}</small><b>${money(e.grandMonth)}</b></div>
   </div>
   <section class="gaps" aria-labelledby="gapsH"><h2 id="gapsH">Action items before deployment</h2>
     ${gaps.length?gaps.map(g=>`<div class="gap"><span class="tag ${g.v==="no"?"no":""}">${g.v==="no"?"No":"Not sure"}</span><p>${esc(g.q.l)}<small>${esc(g.s.title)}</small></p><a href="#${g.s.id}">Update</a></div>`).join(""):`<div class="allclear">No open readiness items. Every check answered so far is ready.</div>`}
@@ -681,6 +720,7 @@ function buildMarkdown(){
   L.push(`## Sizing estimate`,``,`| Source | GB/day | USD/day |`,`|---|---:|---:|`);
   e.items.forEach(i=>L.push(`| ${i.label} | ${i.gb.toFixed(2)} | ${money(i.gb*e.rate)} |`));
   L.push(`| **Total** | **${e.total.toFixed(2)}** | **${money(e.day)}** |`,``,`Monthly: ${money(e.month)} at ${money(e.rate)}/GB. Logging detail multipliers: Lean ×0.7, Standard ×1.0, Verbose ×1.8.`,``);
+  if(e.addonDay>0) L.push(`SAP solution add-on: ${money(e.addonMonth)} a month (${A.sap_prod} production SIDs at ${money(sapRate())} per SID per hour). Total with add-on: ${money(e.grandMonth)} a month.`,``);
   L.push(`## Action items`,``);
   if(gaps.length) gaps.forEach(g=>L.push(`- [${g.v==="no"?"No":"Not sure"}] ${g.q.l} (${g.s.title})`)); else L.push(`None.`);
   L.push(``);
@@ -701,12 +741,12 @@ function buildCSV(){
   SECTIONS.forEach(s=>s.qs.forEach(q=>{ if(!q.g&&visible(q)&&answered(q)) rows.push([s.title,q.l,fmtAnswer(q)]); }));
   const e=estimate();
   e.items.forEach(i=>rows.push(["Sizing estimate",i.label+" (GB/day)",i.gb.toFixed(3)]));
-  rows.push(["Sizing estimate","Total GB/day",e.total.toFixed(3)],["Sizing estimate","USD per month",e.month.toFixed(2)]);
+  rows.push(["Sizing estimate","Total GB/day",e.total.toFixed(3)],["Sizing estimate","USD per month",e.month.toFixed(2)],["Sizing estimate","SAP add-on USD per month",e.addonMonth.toFixed(2)],["Sizing estimate","Total USD per month incl. SAP add-on",e.grandMonth.toFixed(2)]);
   return "\uFEFF"+rows.map(r=>r.map(q2).join(",")).join("\r\n");
 }
 function buildJSON(){
   const e=estimate(); const clean={...A}; delete clean.__seeded;
-  return JSON.stringify({schema:"robomate-sentinel-questionnaire/1",exportedAt:new Date().toISOString(),answers:clean,estimate:{rateUsdPerGb:e.rate,totalGbPerDay:+e.total.toFixed(3),usdPerDay:+e.day.toFixed(2),usdPerMonth:+e.month.toFixed(2),items:e.items.map(i=>({category:CATS[i.cat].name,source:i.label,gbPerDay:+i.gb.toFixed(3)}))}},null,2);
+  return JSON.stringify({schema:"robomate-sentinel-questionnaire/1",exportedAt:new Date().toISOString(),answers:clean,estimate:{rateUsdPerGb:e.rate,totalGbPerDay:+e.total.toFixed(3),usdPerDay:+e.day.toFixed(2),usdPerMonth:+e.month.toFixed(2),sapAddonUsdPerMonth:+e.addonMonth.toFixed(2),totalUsdPerMonthInclAddon:+e.grandMonth.toFixed(2),items:e.items.map(i=>({category:CATS[i.cat].name,source:i.label,gbPerDay:+i.gb.toFixed(3)}))}},null,2);
 }
 let downloadsNS; let downloadsReady=(window.claude&&window.claude.use)?window.claude.use("downloads").then(d=>downloadsNS=d).catch(()=>null):Promise.resolve(null);
 function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),2600);}
@@ -783,6 +823,7 @@ document.addEventListener("click",e=>{
   if(e.target.id==="resetBtn"){ if(confirm("Clear every answer in this questionnaire? This can’t be undone unless you exported a copy.")){ A={}; try{localStorage.removeItem(KEY);}catch(_){}; renderMeter(); route(); toast("All answers cleared"); } }
 });
 $("#rateInput").addEventListener("input",e=>{ A.rate=e.target.value; save(); renderMeter(); if(location.hash==="#review") renderReview(); });
+$("#sapRateInput").addEventListener("input",e=>{ A.sap_rate=e.target.value; save(); renderMeter(); const sid=location.hash.replace("#",""); const sec=SECTIONS.find(x=>x.id===sid); if(sec&&document.getElementById("form")) applyVisibility(sec); if(sid==="review") renderReview(); });
 function importJSON(file){
   if(!file) return;
   const r=new FileReader();
